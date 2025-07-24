@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://your-site-name.netlify.app/sitemap.xml
+
+# Разрешить все для поисковых роботов
+User-agent: Googlebot
+Allow: /
+
+User-agent: Yandexbot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Приоритетные страницы для индексации
+Crawl-delay: 1
