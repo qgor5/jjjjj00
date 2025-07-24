@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="theme-color" content="#DC2626"/>
+    <title>КиноНовинки - Лучшие новинки кино 2025</title>
+    <meta name="description" content="Смотрите лучшие новинки кино 2025 года. Трейлеры, обзоры, рейтинги и информация о всех премьерах фильмов."/>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'red': {
+                            600: '#DC2626',
+                            700: '#B91C1C'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-router-dom@6/dist/umd/react-router-dom.production.min.js"></script>
+    <script>
+        const { useState, useEffect } = React;
+        const { BrowserRouter, Routes, Route, Link, useParams, useSearchParams } = ReactRouterDOM;
+
+        const TMDB_API_KEY = '7cb67565ace3a08cd9d099c749787121';
+        const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+        const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
+
+        // API Helper
+        const fetchFromTMDB = async (endpoint, params = {}) => {
+            const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
+            url.searchParams.append('api_key', TMDB_API_KEY);
+            url.searchParams.append('language', 'ru-RU');
+            
+            Object.entries(params).forEach(([key, value]) => {
+                if (value) url.searchParams.append(key, value);
+            });
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API request failed');
+                return await response.json();
+            } catch (error) {
+                console.error('TMDB API Error:', error);
+                return null;
+            }
+        };
+
+        // Header Component
+        const Header = ({ onGenreClick }) => {
+            const [searchQuery, setSearchQuery] = useState('');
+            const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+            const genres = [
+                { id: 28, name: 'Боевик' },
+                { id: 35, name: 'Комедия' },
+                { id: 18, name: 'Драма' },
+                { id: 27, name: 'Ужасы' },
+                { id: 10749, name: 'Мелодрама' },
+                { id: 878, name: 'Фантастика' },
+                { id: 53, name: 'Триллер' },
+                { id: 16, name: 'Мультфильм' }
+            ];
+
+            const handleSearch = (e) => {
+                e.preventDefault();
+                if (searchQuery.trim()) {
+                    window.location.href = `/search?q=${encodeURIComponent(searchQuery)}`;
+                }
+            };
+
+            return React.createElement('header', {
+                className: "bg-black bg-opacity-95 backdrop-blur-md sticky top-0 z-50 border-b border-gray-800"
+            }, 
+                React.createElement('nav', {
+                    className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+                },
+                    React.createElement('div', {
+                        className: "flex items-center justify-between h-16"
+                    },
+                        // Logo
+                        React.createElement(Link, {
+                            to: "/",
+                            className: "flex items-center space-x-2"
+                        },
+                            React.createElement('div', {
+                                className: "w-8 h-8 bg-red-600 rounded flex items-center justify-center"
+                            },
+                                React.createElement('span', {
+                                    className: "text-white font-bold text-xl"
+                                }, "К")
+                            ),
+                            React.createElement('span', {
+                                className: "text-white font-bold text-xl"
+                            }, "КиноНовинки")
+                        ),
+                        
+                        // Desktop Navigation
+                        React.createElement('div', {
+                            className: "hidden md:flex items-center space-x-8"
+                        },
+                            React.createElement(Link, {
+                                to: "/",
+                                className: "text-white hover:text-red-500 transition-colors"
+                            }, "Главная"),
+                            React.createElement(Link, {
+                                to: "/popular",
+                                className: "text-white hover:text-red-500 transition-colors"
+                            }, "Популярное"),
+                            React.createElement(Link, {
+                                to: "/new-releases", 
+                                className: "text-white hover:text-red-500 transition-colors"
+                            }, "Новинки")
+                        ),
+
+                        // Mobile menu button
+                        React.createElement('button', {
+                            onClick: () => setIsMenuOpen(!isMenuOpen),
+                            className: "md:hidden text-white"
+                        },
+                            React.createElement('svg', {
+                                className: "w-6 h-6",
+                                fill: "none",
+                                stroke: "currentColor", 
+                                viewBox: "0 0 24 24"
+                            },
+                                React.createElement('path', {
+                                    strokeLinecap: "round",
+                                    strokeLinejoin: "round",
+                                    strokeWidth: 2,
+                                    d: "M4 6h16M4 12h16M4 18h16"
+                                })
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
+        // Movie Card Component
+        const MovieCard = ({ movie, isLoading = false }) => {
+            if (isLoading) {
+                return React.createElement('div', {
+                    className: "bg-gray-800 rounded-lg overflow-hidden animate-pulse"
+                },
+                    React.createElement('div', {
+                        className: "aspect-[2/3] bg-gray-700"
+                    }),
+                    React.createElement('div', {
+                        className: "p-4 space-y-2"
+                    },
+                        React.createElement('div', {
+                            className: "h-4 bg-gray-700 rounded"
+                        }),
+                        React.createElement('div', {
+                            className: "h-3 bg-gray-700 rounded w-3/4"
+                        })
+                    )
+                );
+            }
+
+            const movieUrl = `/movie/${movie.id}/${encodeURIComponent(movie.title.toLowerCase().replace(/[^a-zA-Zа-яёА-ЯЁ0-9]/g, '-'))}`;
+
+            return React.createElement('div', {
+                className: "group cursor-pointer transform transition-all duration-300 hover:scale-105"
+            },
+                React.createElement(Link, {
+                    to: movieUrl
+                },
+                    React.createElement('div', {
+                        className: "bg-gray-900 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow"
+                    },
+                        React.createElement('div', {
+                            className: "relative aspect-[2/3] overflow-hidden"
+                        },
+                            movie.poster_path ? 
+                            React.createElement('img', {
+                                src: `${TMDB_IMAGE_BASE}/w500${movie.poster_path}`,
+                                alt: movie.title,
+                                className: "w-full h-full object-cover group-hover:scale-110 transition-transform duration-500",
+                                loading: "lazy"
+                            }) :
+                            React.createElement('div', {
+                                className: "w-full h-full bg-gray-700 flex items-center justify-center"
+                            },
+                                React.createElement('span', {
+                                    className: "text-gray-400 text-4xl"
+                                }, "🎬")
+                            ),
+                            
+                            movie.vote_average > 0 && React.createElement('div', {
+                                className: "absolute top-2 right-2 bg-black bg-opacity-80 text-yellow-400 px-2 py-1 rounded-full text-sm font-bold"
+                            }, `⭐ ${movie.vote_average.toFixed(1)}`)
+                        ),
+                        
+                        React.createElement('div', {
+                            className: "p-4"
+                        },
+                            React.createElement('h3', {
+                                className: "text-white font-semibold text-lg mb-2 line-clamp-2 group-hover:text-red-400 transition-colors"
+                            }, movie.title),
+                            React.createElement('p', {
+                                className: "text-gray-400 text-sm mb-2"
+                            }, movie.release_date ? new Date(movie.release_date).getFullYear() : 'Скоро'),
+                            React.createElement('p', {
+                                className: "text-gray-300 text-sm line-clamp-3 leading-relaxed"
+                            }, movie.overview || 'Описание будет добавлено позже...')
+                        )
+                    )
+                )
+            );
+        };
+
+        // Movies Grid Component  
+        const MoviesGrid = ({ movies, title, isLoading = false }) => {
+            const loadingItems = Array(10).fill(null);
+
+            return React.createElement('section', {
+                className: "py-12"
+            },
+                React.createElement('div', {
+                    className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+                },
+                    React.createElement('h2', {
+                        className: "text-3xl font-bold text-white mb-8"
+                    }, title),
+                    React.createElement('div', {
+                        className: "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"
+                    },
+                        isLoading ? 
+                        loadingItems.map((_, index) => React.createElement(MovieCard, { key: index, isLoading: true })) :
+                        movies.map(movie => React.createElement(MovieCard, { key: movie.id, movie: movie }))
+                    )
+                )
+            );
+        };
+
+        // Home Page Component
+        const HomePage = () => {
+            const [featuredMovie, setFeaturedMovie] = useState(null);
+            const [popularMovies, setPopularMovies] = useState([]);
+            const [newReleases, setNewReleases] = useState([]);
+            const [isLoading, setIsLoading] = useState(true);
+
+            useEffect(() => {
+                const loadHomeData = async () => {
+                    setIsLoading(true);
+                    
+                    const [popular, nowPlaying] = await Promise.all([
+                        fetchFromTMDB('/movie/popular', { page: 1 }),
+                        fetchFromTMDB('/movie/now_playing', { page: 1 })
+                    ]);
+
+                    if (popular?.results) {
+                        setPopularMovies(popular.results);
+                        setFeaturedMovie(popular.results[0]);
+                    }
+                    
+                    if (nowPlaying?.results) {
+                        setNewReleases(nowPlaying.results);
+                    }
+
+                    setIsLoading(false);
+                };
+
+                loadHomeData();
+            }, []);
+
+            return React.createElement('div', {
+                className: "min-h-screen bg-gray-900"
+            },
+                React.createElement(Header),
+                
+                // Hero Section
+                featuredMovie && React.createElement('div', {
+                    className: "relative h-screen overflow-hidden"
+                },
+                    React.createElement('div', {
+                        className: "absolute inset-0 bg-cover bg-center bg-no-repeat",
+                        style: {
+                            backgroundImage: `url(${featuredMovie.backdrop_path ? 
+                                `${TMDB_IMAGE_BASE}/original${featuredMovie.backdrop_path}` : 
+                                'https://images.unsplash.com/photo-1524629802380-04f8ec63f471?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDF8MHwxfHNlYXJjaHwyfHxjaW5lbWElMjB0aGVhdGVyJTIwZGFya3xlbnwwfHx8YmxhY2t8MTc1MzM2MTgzNXww&ixlib=rb-4.1.0&q=85'})`
+                        }
+                    },
+                        React.createElement('div', {
+                            className: "absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent"
+                        }),
+                        React.createElement('div', {
+                            className: "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"
+                        })
+                    ),
+                    
+                    React.createElement('div', {
+                        className: "relative z-10 flex items-center h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+                    },
+                        React.createElement('div', {
+                            className: "max-w-2xl"
+                        },
+                            React.createElement('h1', {
+                                className: "text-5xl md:text-7xl font-bold text-white mb-6 leading-tight"
+                            }, featuredMovie.title),
+                            React.createElement('p', {
+                                className: "text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed"
+                            }, featuredMovie.overview),
+                            React.createElement('div', {
+                                className: "flex items-center space-x-4 mb-8"
+                            },
+                                React.createElement('div', {
+                                    className: "flex items-center space-x-2"
+                                },
+                                    React.createElement('span', {
+                                        className: "text-yellow-400 text-2xl"
+                                    }, "⭐"),
+                                    React.createElement('span', {
+                                        className: "text-white font-bold text-xl"
+                                    }, featuredMovie.vote_average?.toFixed(1))
+                                ),
+                                React.createElement('span', {
+                                    className: "text-gray-400"
+                                }, "|"),
+                                React.createElement('span', {
+                                    className: "text-gray-300 text-lg"
+                                }, featuredMovie.release_date ? new Date(featuredMovie.release_date).getFullYear() : 'Скоро')
+                            ),
+                            React.createElement('div', {
+                                className: "flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4"
+                            },
+                                React.createElement('a', {
+                                    href: "https://www.youtube.com/@KinoBuzz",
+                                    target: "_blank",
+                                    rel: "noopener noreferrer",
+                                    className: "bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-lg font-bold text-lg flex items-center justify-center space-x-2 transition-colors"
+                                },
+                                    React.createElement('svg', {
+                                        className: "w-6 h-6",
+                                        fill: "currentColor",
+                                        viewBox: "0 0 24 24"
+                                    },
+                                        React.createElement('path', {
+                                            d: "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
+                                        })
+                                    ),
+                                    React.createElement('span', null, "Наш YouTube канал")
+                                )
+                            )
+                        )
+                    )
+                ),
+
+                // Main content
+                React.createElement('main', null,
+                    React.createElement(MoviesGrid, {
+                        movies: popularMovies,
+                        title: "🔥 Популярные фильмы",
+                        isLoading: isLoading
+                    }),
+                    React.createElement(MoviesGrid, {
+                        movies: newReleases,
+                        title: "🆕 Новинки кино", 
+                        isLoading: isLoading
+                    })
+                ),
+
+                // Footer
+                React.createElement('footer', {
+                    className: "bg-black text-white py-12 mt-16"
+                },
+                    React.createElement('div', {
+                        className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center"
+                    },
+                        React.createElement('div', {
+                            className: "flex items-center justify-center space-x-2 mb-4"
+                        },
+                            React.createElement('div', {
+                                className: "w-8 h-8 bg-red-600 rounded flex items-center justify-center"
+                            },
+                                React.createElement('span', {
+                                    className: "text-white font-bold text-xl"
+                                }, "К")
+                            ),
+                            React.createElement('span', {
+                                className: "text-white font-bold text-xl"
+                            }, "КиноНовинки")
+                        ),
+                        React.createElement('p', {
+                            className: "text-gray-400 mb-6"
+                        }, "Лучшие новинки кино со всего мира"),
+                        
+                        // Social Media Links
+                        React.createElement('div', {
+                            className: "flex justify-center space-x-4 mb-8"
+                        },
+                            React.createElement('a', {
+                                href: "https://www.youtube.com/@KinoBuzz",
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                className: "w-12 h-12 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center transition-colors"
+                            },
+                                React.createElement('svg', {
+                                    className: "w-6 h-6 text-white",
+                                    fill: "currentColor",
+                                    viewBox: "0 0 24 24"
+                                },
+                                    React.createElement('path', {
+                                        d: "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
+                                    })
+                                )
+                            ),
+                            React.createElement('a', {
+                                href: "https://facebook.com/your-page",
+                                target: "_blank", 
+                                rel: "noopener noreferrer",
+                                className: "w-12 h-12 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center transition-colors"
+                            },
+                                React.createElement('span', {
+                                    className: "text-white text-xl"
+                                }, "f")
+                            )
+                        ),
+                        
+                        React.createElement('p', {
+                            className: "text-gray-400 text-sm"
+                        }, "© 2025 КиноНовинки. Все права защищены.")
+                    )
+                )
+            );
+        };
+
+        // App Component
+        const App = () => {
+            return React.createElement(BrowserRouter, null,
+                React.createElement('div', {
+                    className: "App"
+                },
+                    React.createElement(Routes, null,
+                        React.createElement(Route, {
+                            path: "/",
+                            element: React.createElement(HomePage)
+                        }),
+                        React.createElement(Route, {
+                            path: "*", 
+                            element: React.createElement(HomePage)
+                        })
+                    )
+                )
+            );
+        };
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
+</html>
